@@ -1,3 +1,5 @@
+.vscode/
+
 .haxelib/
 .haxelsp/recording/
 dump/
