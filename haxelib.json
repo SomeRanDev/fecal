@@ -1,0 +1,11 @@
+{
+	"name": "fecal",
+	"version": "1.0.0",
+	"description": "A Haxe testing framework focused on tracking/validating the file output of a Haxe compilation.",
+	"url": "https://github.com/SomeRanDev/fecal",
+	"license": "Public",
+	"dependencies": {},
+	"classPath": "src/",
+	"releasenote": "Initial release",
+	"contributors": ["SomeRanDev"]
+}
