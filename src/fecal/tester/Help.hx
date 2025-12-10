@@ -1,4 +1,4 @@
-package fecal;
+package fecal.tester;
 
 function help() {
 	Sys.println("Fecal tester options
@@ -22,18 +22,12 @@ Simulates a test on a different operating system. This can be helpful for genera
 * --test=TestName
 This option can be added multiple times to specify only certain tests should be run.
 
-======================================================================
-BUILD COMMANDS
-======================================================================
-
-* --build-only
-Builds the already Haxe-compiled tests without recompiling the Haxe.
-
-* --always-build
-The build/execute tests will run no matter what, even if the initial output comparison tests fail.
-
-* --never-build
-The build/execute tests will never run.
+* --build=[only|always|never]
+Controls whether the build/execution tests occur.
+  By default, the build/execution will only run if the Haxe output comparison tests are passed.
+  [only]   The Haxe compilation and comparison tests are skipped.
+  [always] The build/execution tests occur even if the Haxe output comparison tests fail.
+  [never]  The build/execution test never occur even if the Haxe output comparisons tests succeed.
 
 ======================================================================
 DEBUG

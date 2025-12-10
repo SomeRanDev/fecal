@@ -1,4 +1,4 @@
-package fecal;
+package fecal.tester;
 
 /**
     The result of `fecal.Tester.run`.

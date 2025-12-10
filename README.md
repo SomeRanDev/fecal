@@ -44,42 +44,57 @@ Taking a peak into `Test.hx`, you should have something like this:
 ```haxe
 package;
 
+/**
+	Create child class of `fecal.FecalTest` to configure test behavior.
+**/
+class MyCustomTester extends FecalTest {
+	/**
+		This callback generates the arguments for the Haxe compilation test.
+	**/
+	public override function generateHaxeCompilationArguments(
+		outputDirectory: String,
+		testDirectory: String,
+		hxmlFile: {
+			name: String,
+			absolutePath: String
+		},
+		arguments: Arguments,
+	): Array<String> {
+		return [
+			// Depending on how you set up your test, you may need to directly set
+			// source paths to your library's source folder and extraParams.hxml.
+			"-cp ../src",
+			"../extraParams.hxml",
+
+			// Alternatively, you could use `haxelib dev` and call your lib directly:
+			// "-lib myLib",
+
+			// Make sure to include the source folder for this specific test.
+			"-cp " + testDirectory,
+
+			// We need to generate output to check!
+			// Let's make sure it goes into the "output" directory Fecal will be checking.
+			"-js " + outputDirectory,
+
+			// And then finally, add this test's `.hxml` file.
+			"\"" + hxmlFile.absolutePath + "\""
+		];
+	}
+}
+
 function main() {
-	final result = Fecal.test(
+	// Create instance of of custom `FecalTest` child class.
+	final tester = new MyCustomTester(
 		// This is the relative path to the directory of test directories.
 		"MyFrameworkTests",
 
 		// This parameter let's you configure the names of your test folders.
 		// We can pass `null` just to use the defaults.
 		null,
-
-		// This callback configures the arguments for the Haxe compilation in a test.
-		function(data: GenerateTestArgumentsData): Array<String> {
-			return [
-				// Depending on how you set up your test, you may need to directly set
-				// source paths to your library's source folder and extraParams.hxml.
-				"-cp ../src",
-				"../extraParams.hxml",
-
-				// Alternatively, you could use `haxelib dev` and call your lib directly:
-				// "-lib myLib",
-
-				// Make sure to include the source folder for this specific test.
-				"-cp " + data.testDirectory,
-
-				// We need to generate output to check!
-				"-js " + data.outputDirectory,
-
-				// And then finally, add this test's `.hxml` file.
-				"\"" + data.hxmlFile.absolutePath + "\""
-			];
-		},
-
-		// If you'd like to add build and execution steps to your test, you can add callbacks
-		// to generate the commands for those here.
-		null,
-		null,
 	);
+
+	// Run tests!
+	final result = Fecal.test(tester);
 
     // There is an exhaustive list of possible errors and outputs `result` can be, but for now
     // we just check to see if `PassedTests` was returned. This indicates all the tests were successful! 

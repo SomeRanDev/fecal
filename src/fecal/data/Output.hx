@@ -1,4 +1,4 @@
-package fecal;
+package fecal.data;
 
 /**
     Represents an `Array<String>` of length `2`.

@@ -1,4 +1,11 @@
-package fecal;
+package fecal.tester;
+
+enum BuildMode {
+	Default;
+	Only;
+	Always;
+	Never;
+}
 
 @:structInit
 class Arguments {
@@ -9,9 +16,7 @@ class Arguments {
 	public var updateIntendedSys(default, null) = false;
 	public var osExclusive(default, null) = false;
 	public var noDetails(default, null) = false;
-	public var buildOnly(default, null) = false;
-	public var alwaysBuild(default, null) = false;
-	public var neverBuild(default, null) = false;
+	public var buildMode(default, null): BuildMode = Default;
 	public var simulatePlatform(default, null): Null<String> = null;
 	public var specifiedTests(default, null): Null<Array<String>> = null;
 
@@ -32,15 +37,20 @@ class Arguments {
 		var updateIntendedSys = args.contains("--update-intended-sys");
 		var osExclusive = args.contains("--os-exclusive");
 		var noDetails = args.contains("--no-details");
-		var buildOnly = args.contains("--build-only");
-		var alwaysBuild = args.contains("--always-build");
-		var neverBuild = args.contains("--never-build");
 		var simulatePlatform: Null<String> = null;
 
-		if(args.contains("--dev-mode")) {
-			alwaysBuild = true;
-			showAllOutput = true;
-			noDetails = true;
+		// ------------------------------------
+		// Build mode
+		// ------------------------------------
+		var buildMode = Default;
+		for(a in args) {
+			if(StringTools.startsWith(a, "--build=")) {
+				final r = ~/^build=(\w+)$/;
+				if(r.match(a)) {
+					buildMode = stringToBuildMode(r.matched(1));
+					break;
+				}
+			}
 		}
 
 		// ------------------------------------
@@ -68,17 +78,34 @@ class Arguments {
 			}
 		}).filter(a -> a != null);
 
+		// ------------------------------------
+		// Dev Mode
+		// TODO: This seems kinda random, remove?
+		// ------------------------------------
+		if(args.contains("--dev-mode")) {
+			buildMode = Always;
+			showAllOutput = true;
+			noDetails = true;
+		}
+
 		return {
 			showAllOutput: showAllOutput,
 			updateIntended: updateIntended,
 			updateIntendedSys: updateIntendedSys,
 			osExclusive: osExclusive,
 			noDetails: noDetails,
-			buildOnly: buildOnly,
-			alwaysBuild: alwaysBuild,
-			neverBuild: neverBuild,
+			buildMode: buildMode,
 			simulatePlatform: simulatePlatform,
 			specifiedTests: specifiedTests.length == 0 ? null : specifiedTests,
+		}
+	}
+
+	static function stringToBuildMode(s: String) {
+		return switch(s.toLowerCase()) {
+			case "only": Only;
+			case "always": Always;
+			case "never": Never;
+			case _: Default;
 		}
 	}
 }

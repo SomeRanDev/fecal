@@ -1,11 +1,9 @@
-package fecal;
+package fecal.tester;
 
 import fecal.data.FolderNames;
-import fecal.data.GenerateBuildCommandData;
-import fecal.data.GenerateExecuteCommandData;
-import fecal.data.GenerateTestArgumentsData;
-import fecal.Help.help;
-import fecal.Output;
+import fecal.data.Output;
+import fecal.tester.Arguments;
+import fecal.tester.Help.help;
 import fecal.Utils.printlnErr;
 
 import haxe.io.Path;
@@ -16,30 +14,14 @@ import sys.io.Process;
 	The class that contains the actual testing code.
 **/
 class Tester {
-	var testsDirectory: String;
-	var folderNames: FolderNames;
-	var generateTestArguments: (GenerateTestArgumentsData) -> Array<String>;
-	var generateBuildCommand: Null<(GenerateBuildCommandData) -> String>;
-	var generateExecuteCommand: Null<(GenerateExecuteCommandData) -> Null<String>>;
-
+	var test: FecalTest;
 	var arguments: Arguments;
 
 	/**
 		Constructor.
 	**/
-	public function new(
-		testsDirectory: String,
-		folderNames: FolderNames,
-		generateTestArguments: (GenerateTestArgumentsData) -> Array<String>,
-		generateBuildCommand: Null<(GenerateBuildCommandData) -> String>,
-		generateExecuteCommand: Null<(GenerateExecuteCommandData) -> Null<String>>,
-	) {
-		this.testsDirectory = testsDirectory;
-		this.folderNames = folderNames;
-		this.generateTestArguments = generateTestArguments;
-		this.generateBuildCommand = generateBuildCommand;
-		this.generateExecuteCommand = generateExecuteCommand;
-
+	public function new(test: FecalTest) {
+		this.test = test;
 		arguments = Arguments.initFromArgs();
 	}
 
@@ -56,7 +38,7 @@ class Tester {
 
 		// ------------------------------------
 		// Get a list of all tests.
-		var tests = switch(checkAndReadDir(testsDirectory)) {
+		var tests = switch(checkAndReadDir(test.testsDirectory)) {
 			case Ok(tests): tests;
 			case error: return error.convert();
 		}
@@ -68,15 +50,15 @@ class Tester {
 		}
 		if(arguments.osExclusive) {
 			tests = tests.filter(function(t) {
-				final sysDir = folderNames.intendedOutput + "-" + systemName();
-				return FileSystem.exists(Path.join([testsDirectory, t, sysDir]));
+				final sysDir = test.folderNames.intendedOutput + "-" + systemName();
+				return FileSystem.exists(Path.join([test.testsDirectory, t, sysDir]));
 			});
 		}
 
 		// ------------------------------------
 		// Output comparison tests.
 		var failures = 0;
-		if(!arguments.buildOnly) {
+		if(arguments.buildMode != Only) {
 			for(t in tests) {
 				switch(doHaxeCompilationTest(t)) {
 					case Ok(true): {
@@ -95,17 +77,15 @@ class Tester {
 		// ------------------------------------
 		// If not all comparison tests passed, exit here.
 		final testCount = tests.length;
-		if(failures > 0 && !arguments.alwaysBuild) {
+		if(failures > 0 && arguments.buildMode != Always) {
 			return Ok(FailedComparisonTests(failures, testCount));
 		}
 
 		// ------------------------------------
 		// Check if we should build.
-		if(arguments.neverBuild || generateBuildCommand == null) {
+		if(arguments.buildMode == Never) {
 			return Ok(NeverBuild);
 		}
-
-		final generateBuildCommand: (GenerateBuildCommandData) -> String = generateBuildCommand;
 
 		failures = 0;
 		final systemName = systemName();
@@ -127,8 +107,7 @@ class Tester {
 			switch(doBuildAndExecutionTest(
 				t,
 				systemName,
-				originalCwd,
-				generateBuildCommand
+				originalCwd
 			)) {
 				case Ok(_): {}
 				case error: {
@@ -182,7 +161,7 @@ class Tester {
 	**/
 	function doHaxeCompilationTest(testDirectory: String): Error<Bool> {
 		Sys.println("-- " + testDirectory + " --");
-		final testDir = Path.join([testsDirectory, testDirectory]);
+		final testDir = Path.join([test.testsDirectory, testDirectory]);
 		final hxmlFiles = switch(checkAndReadDir(testDir)) {
 			case Ok(files): files;
 			case error: return error.convert();
@@ -207,15 +186,12 @@ class Tester {
 
 		for(hxml in hxmlFiles) {
 			final absPath = Path.join([testDir, hxml]);
-			final args = generateTestArguments({
-				outputDirectory: Path.join([testDir, noIntended ? folderNames.output : getOutputDirectory(testDir)]),
-				testDirectory: testDir,
-				hxmlFile: {
-					name: hxml,
-					absolutePath: absPath
-				},
-				arguments: arguments,
-			});
+			final args = test.generateHaxeCompilationArguments(
+				Path.join([testDir, noIntended ? test.folderNames.output : getOutputDirectory(testDir)]),
+				testDir,
+				{ name: hxml, absolutePath: absPath },
+				arguments,
+			);
 
 			Sys.println("haxe " + args.join(" "));
 			Sys.println("");
@@ -257,17 +233,17 @@ class Tester {
 		This can change depending on platform or if a user is updating the intended content.
 	**/
 	function getOutputDirectory(testDir: String): String {
-		final sysDir = folderNames.intendedOutput + "-" + systemName();
+		final sysDir = test.folderNames.intendedOutput + "-" + systemName();
 		return if(arguments.updateIntendedSys) {
 			sysDir;
 		} else if(arguments.updateIntended) {
 			if(FileSystem.exists(Path.join([testDir, sysDir]))) {
 				sysDir;
 			} else {
-				folderNames.intendedOutput;
+				test.folderNames.intendedOutput;
 			}
 		} else {
-			folderNames.output;
+			test.folderNames.output;
 		}
 	}
 
@@ -300,13 +276,13 @@ class Tester {
 		If they are, `true` is returned.
 	**/
 	function compareOutputFolders(testDir: String): Bool {
-		final outFolder = Path.join([testDir, folderNames.output]);
-		final intendedFolderSys = Path.join([testDir, folderNames.intendedOutput + "-" + systemName()]);
+		final outFolder = Path.join([testDir, test.folderNames.output]);
+		final intendedFolderSys = Path.join([testDir, test.folderNames.intendedOutput + "-" + systemName()]);
 
 		final intendedFolder = if(FileSystem.exists(intendedFolderSys)) {
 			intendedFolderSys;
 		} else {
-			Path.join([testDir, folderNames.intendedOutput]);
+			Path.join([testDir, test.folderNames.intendedOutput]);
 		}
 
 		if(!FileSystem.exists(intendedFolder)) {
@@ -436,15 +412,14 @@ class Tester {
 		testDirectory: String,
 		systemName: String,
 		originalCwd: String,
-		generateBuildCommand: (GenerateBuildCommandData) -> String
 	): Error<{
 		buildOutput: Output,
 		executionOutput: Output
 	}> {
 		Sys.println("-- " + testDirectory + " --");
 
-		final testDir = Path.join([testsDirectory, testDirectory]);
-		final buildDir = Path.join([testDir, folderNames.build]);
+		final testDir = Path.join([test.testsDirectory, testDirectory]);
+		final buildDir = Path.join([testDir, test.folderNames.build]);
 
 		if(!FileSystem.exists(buildDir)) {
 			FileSystem.createDirectory(buildDir);
@@ -453,57 +428,60 @@ class Tester {
 		Sys.println("cd " + buildDir);
 		Sys.setCwd(buildDir);
 
-		final compileCommand = generateBuildCommand({
-			outputDirectory: folderNames.output,
-			buildDirectory: buildDir,
-			testDirectory: testDir,
-			arguments: arguments,
-		});
-		Sys.println(compileCommand);
-		Sys.println("");
+		final compileCommand = test.generateBuildCommand(
+			test.folderNames.output,
+			buildDir,
+			testDir,
+			arguments,
+		);
 
-		final compileProcess = new Process(compileCommand);
+		final result: Error<{ buildOutput: Output, executionOutput: Output }> = if(compileCommand != null) {
+			Sys.println(compileCommand);
+			Sys.println("");
 
-		final stdoutContent = compileProcess.stdout.readAll().toString();
-		final stderrContent = compileProcess.stderr.readAll().toString();
-		final ec = compileProcess.exitCode();
-		compileProcess.close();
+			final compileProcess = new Process(compileCommand);
 
-		final buildOutput = [stdoutContent, stderrContent];
+			final stdoutContent = compileProcess.stdout.readAll().toString();
+			final stderrContent = compileProcess.stderr.readAll().toString();
+			final ec = compileProcess.exitCode();
+			compileProcess.close();
 
-		final result: Error<{ buildOutput: Output, executionOutput: Output }> = if(ec != 0) {
-			BuildFailed(buildOutput);
-		} else if(generateExecuteCommand != null) {
-			final executeProcessCommand = generateExecuteCommand({
-				outputDirectory: folderNames.output,
-				buildDirectory: buildDir,
-				testDirectory: testDir,
-				arguments: arguments,
-			});
+			final buildOutput = [stdoutContent, stderrContent];
 
-			if(executeProcessCommand != null) {
-				final executeProcess = new Process(executeProcessCommand);
-				final exeOut = executeProcess.stdout.readAll().toString();
-				final exeErr = executeProcess.stderr.readAll().toString();
-				final exeEc = executeProcess.exitCode();
-				final executionOutput = [exeOut, exeErr];
-				if(exeEc != 0) {
-					ExecutionFailed(buildOutput, executionOutput, exeEc);
+			if(ec != 0) {
+				BuildFailed(buildOutput);
+			} else {
+				final executeProcessCommand = test.generateExecuteCommand(
+					test.folderNames.output,
+					buildDir,
+					testDir,
+					arguments,
+				);
+
+				if(executeProcessCommand != null) {
+					final executeProcess = new Process(executeProcessCommand);
+					final exeOut = executeProcess.stdout.readAll().toString();
+					final exeErr = executeProcess.stderr.readAll().toString();
+					final exeEc = executeProcess.exitCode();
+					final executionOutput = [exeOut, exeErr];
+					if(exeEc != 0) {
+						ExecutionFailed(buildOutput, executionOutput, exeEc);
+					} else {
+						Ok({
+							buildOutput: buildOutput,
+							executionOutput: executionOutput,
+						});
+					}
 				} else {
 					Ok({
 						buildOutput: buildOutput,
-						executionOutput: executionOutput,
+						executionOutput: ["", ""],
 					});
 				}
-			} else {
-				Ok({
-					buildOutput: buildOutput,
-					executionOutput: ["", ""],
-				});
 			}
 		} else {
 			Ok({
-				buildOutput: buildOutput,
+				buildOutput: ["", ""],
 				executionOutput: ["", ""],
 			});
 		}
