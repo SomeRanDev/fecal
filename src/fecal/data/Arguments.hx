@@ -1,5 +1,8 @@
-package fecal.tester;
+package fecal.data;
 
+/**
+	The mode parsed from `--build=[only|always|never]`.
+**/
 enum BuildMode {
 	Default;
 	Only;
@@ -7,6 +10,9 @@ enum BuildMode {
 	Never;
 }
 
+/**
+	Used to parse and store command line arguments.
+**/
 @:structInit
 class Arguments {
 	public var help(default, null) = false;

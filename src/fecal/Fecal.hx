@@ -1,6 +1,5 @@
 package fecal;
 
-import fecal.data.FolderNames;
 import fecal.tester.Tester;
 import fecal.tester.TesterResult;
 

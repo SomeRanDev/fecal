@@ -1,7 +1,7 @@
 package fecal;
 
+import fecal.data.Arguments;
 import fecal.data.FolderNames;
-import fecal.tester.Arguments;
 
 /**
 	To configure the behavior of how tests run in your project, you must create a child

@@ -1,8 +1,7 @@
 package fecal.tester;
 
-import fecal.data.FolderNames;
+import fecal.data.Arguments;
 import fecal.data.Output;
-import fecal.tester.Arguments;
 import fecal.tester.Help.help;
 import fecal.Utils.printlnErr;
 
@@ -413,6 +412,7 @@ class Tester {
 		systemName: String,
 		originalCwd: String,
 	): Error<{
+		didAnything: Bool,
 		buildOutput: Output,
 		executionOutput: Output
 	}> {
@@ -425,7 +425,6 @@ class Tester {
 			FileSystem.createDirectory(buildDir);
 		}
 
-		Sys.println("cd " + buildDir);
 		Sys.setCwd(buildDir);
 
 		final compileCommand = test.generateBuildCommand(
@@ -435,7 +434,12 @@ class Tester {
 			arguments,
 		);
 
-		final result: Error<{ buildOutput: Output, executionOutput: Output }> = if(compileCommand != null) {
+		final result: Error<{
+			didAnything: Bool,
+			buildOutput: Output,
+			executionOutput: Output
+		}> = if(compileCommand != null) {
+			Sys.println("cd " + buildDir);
 			Sys.println(compileCommand);
 			Sys.println("");
 
@@ -468,12 +472,14 @@ class Tester {
 						ExecutionFailed(buildOutput, executionOutput, exeEc);
 					} else {
 						Ok({
+							didAnything: true,
 							buildOutput: buildOutput,
 							executionOutput: executionOutput,
 						});
 					}
 				} else {
 					Ok({
+						didAnything: true,
 						buildOutput: buildOutput,
 						executionOutput: ["", ""],
 					});
@@ -481,6 +487,7 @@ class Tester {
 			}
 		} else {
 			Ok({
+				didAnything: false,
 				buildOutput: ["", ""],
 				executionOutput: ["", ""],
 			});
